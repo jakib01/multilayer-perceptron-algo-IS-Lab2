@@ -1,75 +1,76 @@
+# Reimporting libraries after reset
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Generate input data (20 evenly spaced values between 0 and 1)
-x = np.linspace(0.1, 1, 20).reshape(-1, 1)
-
-# Generate target outputs using the given formula
-y = ((1 + 0.6 * np.sin(2 * np.pi * x / 0.7)) + 0.3 * np.sin(2 * np.pi * x)) / 2
-
-# Normalize the data for better training stability
-x = (x - x.min()) / (x.max() - x.min())
-y = (y - y.min()) / (y.max() - y.min())
-
-# Define the MLP structure
+# Constants
 input_size = 1
-hidden_size = 6  # Choosing 6 hidden neurons (between 4 and 8)
 output_size = 1
-learning_rate = 0.1
-epochs = 10000
+hidden_layer_size = 5  # Match your code's hidden layer size (5 neurons)
+learning_rate = 0.01  # Match your learning rate
+epochs = 10000  # Match your number of epochs
+
+# Generate input and output data
+X = np.linspace(0, 1, 20).reshape(-1, input_size)  # Input data
+Y = (1 + 0.6 * np.sin(2 * np.pi * X[:, 0] / 0.7)) + 0.3 * np.sin(2 * np.pi * X[:, 0]) / 2  # Target function
 
 # Initialize weights and biases
 np.random.seed(42)  # For reproducibility
-weights_input_hidden = np.random.rand(input_size, hidden_size)
-bias_hidden = np.random.rand(hidden_size)
-weights_hidden_output = np.random.rand(hidden_size, output_size)
-bias_output = np.random.rand(output_size)
+w1 = np.random.rand(input_size, hidden_layer_size)  # Weights from input to hidden layer
+b1 = np.random.rand(hidden_layer_size)  # Bias for hidden layer
+w2 = np.random.rand(hidden_layer_size, output_size)  # Weights from hidden to output layer
+b2 = np.random.rand(output_size)  # Bias for output layer
 
-# Activation functions and their derivatives
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+# Activation function: Hyperbolic Tangent (tanh)
+def tanh(x):
+    return np.tanh(x)
 
-def sigmoid_derivative(x):
-    return x * (1 - x)
+# Derivative of tanh
+def tanh_derivative(x):
+    return 1.0 - np.tanh(x) ** 2
 
-def linear(x):
-    return x
-
-def linear_derivative(x):
-    return np.ones_like(x)
-
-# Training using Backpropagation
+# Training the model
 for epoch in range(epochs):
     # Forward pass
-    hidden_input = np.dot(x, weights_input_hidden) + bias_hidden
-    hidden_output = sigmoid(hidden_input)
-    final_input = np.dot(hidden_output, weights_hidden_output) + bias_output
-    final_output = linear(final_input)
+    hidden_layer_input = np.dot(X, w1) + b1  # Input to hidden layer
+    hidden_layer_output = tanh(hidden_layer_input)  # Output of hidden layer
 
-    # Compute error
-    error = y - final_output
+    output_layer_input = np.dot(hidden_layer_output, w2) + b2  # Input to output layer
+    predicted_output = output_layer_input  # Linear activation at output layer
+
+    # Error calculation
+    error = Y.reshape(-1, 1) - predicted_output  # Error between target and predicted output
+
+    # Report error every 5000 epochs
+    if epoch % 5000 == 0:
+        print(f'Epoch {epoch}, Error: {np.mean(np.abs(error))}')
 
     # Backpropagation
-    output_gradient = error * linear_derivative(final_output)
-    hidden_error = np.dot(output_gradient, weights_hidden_output.T)
-    hidden_gradient = hidden_error * sigmoid_derivative(hidden_output)
+    # Gradient for output layer
+    d_output = error  # Linear activation gradient
+
+    # Gradient for hidden layer
+    error_hidden_layer = d_output.dot(w2.T) * tanh_derivative(hidden_layer_input)
 
     # Update weights and biases
-    weights_hidden_output += learning_rate * np.dot(hidden_output.T, output_gradient)
-    bias_output += learning_rate * np.sum(output_gradient, axis=0)
-    weights_input_hidden += learning_rate * np.dot(x.T, hidden_gradient)
-    bias_hidden += learning_rate * np.sum(hidden_gradient, axis=0)
+    w2 += hidden_layer_output.T.dot(d_output) * learning_rate  # Hidden-to-output weights
+    b2 += np.sum(d_output, axis=0) * learning_rate  # Output bias
+    w1 += X.T.dot(error_hidden_layer) * learning_rate  # Input-to-hidden weights
+    b1 += np.sum(error_hidden_layer, axis=0) * learning_rate  # Hidden bias
 
-# Predict the outputs using the trained MLP
-predicted_output = linear(np.dot(sigmoid(np.dot(x, weights_input_hidden) + bias_hidden), weights_hidden_output) + bias_output)
+# Print final weights and biases
+print("\nFinal Weights and Biases:")
+print("Weights from Input to Hidden Layer (w1):", w1)
+print("Biases for Hidden Layer (b1):", b1)
+print("Weights from Hidden to Output Layer (w2):", w2)
+print("Biases for Output Layer (b2):", b2)
 
-# Plot the results
+# Plot results
 plt.figure(figsize=(10, 6))
-plt.plot(x, y, label="Target", marker='o')
-plt.plot(x, predicted_output, label="MLP Output", linestyle='dashed')
-plt.xlabel("Input (x)")
-plt.ylabel("Output (y)")
-plt.title("MLP Approximation of the Target Function")
+plt.plot(X, Y, label='True Output', color='g', marker='o')
+plt.plot(X, predicted_output, label='Predicted Output', color='r', linestyle='--', marker='x')
+plt.title('Predicted Output vs True Output')
+plt.xlabel('Input X')
+plt.ylabel('Output Y')
 plt.legend()
-plt.grid()
+plt.grid(True)
 plt.show()
